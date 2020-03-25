@@ -54,7 +54,11 @@ do {									\
 	}								\
 } while (0)
 
-bool daos_initialized;
+static bool daos_initialized;
+static int num_threads;
+static pthread_mutex_t daos_mutex = PTHREAD_MUTEX_INITIALIZER;
+daos_handle_t poh, coh;
+dfs_t *dfs;
 
 struct daos_iou {
 	struct io_u	*io_u;
@@ -135,11 +139,8 @@ daos_fio_init(struct thread_data *td)
 	daos_cont_info_t	co_info;
 	int			rc;
 
-	if (daos_initialized)
-		return 0;
-
-	if (!eo->pool || !eo->cont || !eo->svcl)
-		ERR("Missing required DAOS options\n");
+	pthread_mutex_lock(&daos_mutex);
+	num_threads++;
 
 	/* Allocate space for DAOS-related data */
 	dd = malloc(sizeof(*dd));
@@ -149,35 +150,44 @@ daos_fio_init(struct thread_data *td)
 	if (dd->io_us == NULL)
 		ERR("Failed to allocate IO queue\n");
 
-	rc = daos_init();
-	if (rc != -DER_ALREADY && rc)
-		DCHECK(rc, "Failed to initialize daos");
+	if (!daos_initialized) {
+		if (!eo->pool || !eo->cont || !eo->svcl)
+			ERR("Missing required DAOS options\n");
 
-	rc = uuid_parse(eo->pool, pool_uuid);
-	DCHECK(rc, "Failed to parse 'Pool uuid': %s", eo->pool);
-	rc = uuid_parse(eo->cont, co_uuid);
-	DCHECK(rc, "Failed to parse 'Cont uuid': %s", eo->cont);
-	svcl = daos_rank_list_parse(eo->svcl, ":");
-	if (svcl == NULL)
-		ERR("Failed to allocate svcl");
+		rc = daos_init();
+		if (rc != -DER_ALREADY && rc)
+			DCHECK(rc, "Failed to initialize daos");
 
-	rc = daos_pool_connect(pool_uuid, NULL, svcl, DAOS_PC_RW,
-			       &dd->poh, &pool_info, NULL);
-	d_rank_list_free(svcl);
-	DCHECK(rc, "Failed to connect to pool");
+		rc = uuid_parse(eo->pool, pool_uuid);
+		DCHECK(rc, "Failed to parse 'Pool uuid': %s", eo->pool);
+		rc = uuid_parse(eo->cont, co_uuid);
+		DCHECK(rc, "Failed to parse 'Cont uuid': %s", eo->cont);
+		svcl = daos_rank_list_parse(eo->svcl, ":");
+		if (svcl == NULL)
+			ERR("Failed to allocate svcl");
 
-	rc = daos_cont_open(dd->poh, co_uuid, DAOS_COO_RW, &dd->coh, &co_info,
-			    NULL);
-	DCHECK(rc, "Failed to open container");
+		rc = daos_pool_connect(pool_uuid, NULL, svcl, DAOS_PC_RW,
+				       &poh, &pool_info, NULL);
+		d_rank_list_free(svcl);
+		DCHECK(rc, "Failed to connect to pool");
 
-	rc = dfs_mount(dd->poh, dd->coh, O_RDWR, &dd->dfs);
-	DCHECK(rc, "Failed to mount DFS namespace");
+		rc = daos_cont_open(poh, co_uuid, DAOS_COO_RW, &coh, &co_info, NULL);
+		DCHECK(rc, "Failed to open container");
+
+		rc = dfs_mount(poh, coh, O_RDWR, &dfs);
+		DCHECK(rc, "Failed to mount DFS namespace");
+		daos_initialized = true;
+	}
+
+	dd->poh.cookie = poh.cookie;
+	dd->coh.cookie = coh.cookie;
+	dd->dfs = dfs;
 
 	td->io_ops_data = dd;
 	printf("[Init] pool_id=%s, container_id=%s, svcl=%s, chunk_size=%ld\n",
 	       eo->pool, eo->cont, eo->svcl, eo->chsz);
-	daos_initialized = true;
 
+	pthread_mutex_unlock(&daos_mutex);
 	return 0;
 }
 
@@ -186,13 +196,22 @@ daos_fio_cleanup(struct thread_data *td)
 {
 	struct daos_data *dd = td->io_ops_data;
 
+	pthread_mutex_lock(&daos_mutex);
+	num_threads--;
+
+	free(dd->io_us);
+	free(dd);
+
+	if (num_threads != 0) {
+		pthread_mutex_unlock(&daos_mutex);
+		return;
+	}
+
 	dfs_umount(dd->dfs);
 	daos_cont_close(dd->coh, NULL);
 	daos_pool_disconnect(dd->poh, NULL);
 	daos_fini();
-
-	free(dd->io_us);
-	free(dd);
+	pthread_mutex_unlock(&daos_mutex);
 }
 
 static int
