@@ -190,10 +190,9 @@ daos_fio_cleanup(struct thread_data *td)
 	pthread_mutex_lock(&daos_mutex);
 	num_threads--;
 
-	free(dd->io_us);
-	free(dd);
-
 	if (num_threads != 0) {
+		free(dd->io_us);
+		free(dd);
 		pthread_mutex_unlock(&daos_mutex);
 		return;
 	}
@@ -202,6 +201,9 @@ daos_fio_cleanup(struct thread_data *td)
 	daos_cont_close(dd->coh, NULL);
 	daos_pool_disconnect(dd->poh, NULL);
 	daos_fini();
+	free(dd->io_us);
+	free(dd);
+	daos_initialized = false;
 	pthread_mutex_unlock(&daos_mutex);
 }
 
