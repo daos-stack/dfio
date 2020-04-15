@@ -41,6 +41,18 @@ do {									\
 	return -1;							\
 } while (0)
 
+#define ERR_PRINT(rc, format, ...)					\
+do {									\
+	int _rc = (rc);							\
+									\
+	if (_rc < 0) {							\
+		fprintf(stderr, "ERROR (%s:%d): %d: "			\
+			format"\n", __FILE__, __LINE__,  _rc,		\
+			##__VA_ARGS__);					\
+		fflush(stderr);						\
+	}								\
+} while (0)
+
 #define DCHECK(rc, format, ...)						\
 do {									\
 	int _rc = (rc);							\
@@ -199,17 +211,13 @@ daos_fio_cleanup(struct thread_data *td)
 	}
 
 	rc = dfs_umount(dd->dfs);
-	if (rc)
-		D_ERROR("failed to umount dfs: rc = %d\n", rc);
+	ERR_PRINT(rc, "failed to umount dfs.");
 	rc = daos_cont_close(dd->coh, NULL);
-	if (rc)
-		D_ERROR("failed to close container: "DF_RC"\n", DP_RC(rc));
+	ERR_PRINT(rc, "failed to close container.");
 	rc = daos_pool_disconnect(dd->poh, NULL);
-	if (rc)
-		D_ERROR("failed to disconnect pool: "DF_RC"\n", DP_RC(rc));
+	ERR_PRINT(rc, "failed to disconnect pool.");
 	rc = daos_fini();
-	if (rc)
-		D_ERROR("failed to finalize daos: "DF_RC"\n", DP_RC(rc));
+	ERR_PRINT(rc, "failed to finalize daos.");
 
 	free(dd->io_us);
 	free(dd);
