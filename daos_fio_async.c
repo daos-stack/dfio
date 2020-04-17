@@ -32,6 +32,7 @@
 #include <daos_fs.h>
 #include <gurt/common.h>
 #include <gurt/hash.h>
+
 #define ERR(MSG)							\
 do {									\
 	fprintf(stderr, "ERROR (%s:%d): %s",				\
