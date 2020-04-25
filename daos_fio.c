@@ -24,7 +24,6 @@
 #include <fcntl.h>
 #include <libgen.h>
 
-#include <config-host.h>
 #include <fio.h>
 #include <optgroup.h>
 
@@ -263,7 +262,7 @@ daos_fio_invalidate(struct thread_data *td, struct fio_file *f)
 	return 0;
 }
 
-static int
+static enum fio_q_status
 daos_fio_queue(struct thread_data *td, struct io_u *io_u)
 {
 	struct daos_data *dd = td->io_ops_data;

@@ -24,7 +24,6 @@
 #include <fcntl.h>
 #include <libgen.h>
 
-#include <config-host.h>
 #include <fio.h>
 #include <optgroup.h>
 
@@ -191,6 +190,9 @@ daos_fio_init(struct thread_data *td)
 		daos_initialized = true;
 	}
 
+	rc = daos_eq_create(&dd->eqh);
+	DCHECK(rc, "Failed to create event queue");
+
 	dd->poh.cookie = poh.cookie;
 	dd->coh.cookie = coh.cookie;
 	dd->dfs = dfs;
@@ -213,6 +215,8 @@ daos_fio_cleanup(struct thread_data *td)
 	num_threads--;
 
 	if (num_threads != 0) {
+		rc = daos_eq_destroy(dd->eqh, DAOS_EQ_DESTROY_FORCE);
+		ERR_PRINT(rc < 0, "failed to destroy event queue.");
 		free(dd->io_us);
 		free(dd);
 		pthread_mutex_unlock(&daos_mutex);
@@ -225,6 +229,8 @@ daos_fio_cleanup(struct thread_data *td)
 	ERR_PRINT(rc, "failed to close container.");
 	rc = daos_pool_disconnect(dd->poh, NULL);
 	ERR_PRINT(rc, "failed to disconnect pool.");
+	rc = daos_eq_destroy(dd->eqh, DAOS_EQ_DESTROY_FORCE);
+	ERR_PRINT(rc < 0, "failed to destroy event queue.");
 	rc = daos_fini();
 	ERR_PRINT(rc, "failed to finalize daos.");
 	free(dd->io_us);
@@ -309,41 +315,41 @@ static int daos_fio_getevents(struct thread_data *td, unsigned int min,
 			      unsigned int max, const struct timespec *t)
 {
 	struct daos_data *dd = td->io_ops_data;
+	daos_event_t *evp[max];
 	unsigned int events = 0;
-	struct io_u *io_u;
 	int i;
+	int rc;
 
-	do {
-		io_u_qiter(&td->io_u_all, io_u, i) {
-			struct daos_iou *io = io_u->engine_data;
-			bool ev_flag;
+	while (events < min) {
+		rc = daos_eq_poll(dd->eqh, 1, DAOS_EQ_NOWAIT, max, evp);
+		DCHECK(rc < 0, "event poll failed with %d", rc);
 
-			if (io->complete)
-				continue;
+		for (i = 0; i < rc; i++) {
+			struct daos_iou	*io;
+			struct io_u	*io_u;
 
-			daos_event_test(&io->ev, DAOS_EQ_NOWAIT, &ev_flag);
-			if (!ev_flag)
-				continue;
+			io = container_of(evp[i], struct daos_iou, ev);
+			DCHECK(!io->complete,
+			       "completion on already completed I/O");
+			io_u = io->io_u;
 
 			if (io->ev.ev_error)
 				io_u->error = io->ev.ev_error;
 			else
 				io_u->resid = 0;
+
 			dd->io_us[events] = io_u;
 			dd->queued--;
 			daos_event_fini(&io->ev);
 			io->complete = true;
 			events++;
 		}
-		if (events < min)
-			continue;
-		break;
-	} while (1);
+	}
 
 	return events;
 }
 
-static int
+static enum fio_q_status
 daos_fio_queue(struct thread_data *td, struct io_u *io_u)
 {
 	struct daos_data *dd = td->io_ops_data;
@@ -361,7 +367,7 @@ daos_fio_queue(struct thread_data *td, struct io_u *io_u)
 	io->sgl.sg_iovs = &io->iov;
 
 	io->complete = false;
-	rc = daos_event_init(&io->ev, DAOS_HDL_INVAL, NULL);
+	rc = daos_event_init(&io->ev, dd->eqh, NULL);
 	DCHECK(rc, "daos_event_init() failed.");
 
 	switch (io_u->ddir) {
