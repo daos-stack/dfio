@@ -373,12 +373,20 @@ daos_fio_queue(struct thread_data *td, struct io_u *io_u)
 	switch (io_u->ddir) {
 	case DDIR_WRITE:
 		rc = dfs_write(dd->dfs, dd->obj, &io->sgl, offset, &io->ev);
-		DCHECK(rc, "dfs_write() failed.");
+		if (rc) {
+			ERR_PRINT(rc, "dfs_write failed.");
+			io_u->error = rc;
+			return FIO_Q_COMPLETED;
+		}
 		break;
 	case DDIR_READ:
 		rc = dfs_read(dd->dfs, dd->obj, &io->sgl, offset, &ret,
 			      &io->ev);
-		DCHECK(rc, "dfs_read() failed.");
+		if (rc) {
+			ERR_PRINT(rc, "dfs_read failed.");
+			io_u->error = rc;
+			return FIO_Q_COMPLETED;
+		}
 		break;
 	default:
 		ERR("Invalid IO type\n");
