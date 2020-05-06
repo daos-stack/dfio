@@ -32,44 +32,12 @@
 #include <gurt/common.h>
 #include <gurt/hash.h>
 
-#define ERR(MSG)							\
-do {									\
-	fprintf(stderr, "ERROR (%s:%d): %s",				\
-		__FILE__, __LINE__, MSG);				\
-	fflush(stderr);							\
-	return -1;							\
-} while (0)
-
-#define ERR_PRINT(rc, format, ...)					\
-do {									\
-	int _rc = (rc);							\
-									\
-	if (_rc < 0) {							\
-		fprintf(stderr, "ERROR (%s:%d): %d: "			\
-			format"\n", __FILE__, __LINE__,  _rc,		\
-			##__VA_ARGS__);					\
-		fflush(stderr);						\
-	}								\
-} while (0)
-
-#define DCHECK(rc, format, ...)						\
-do {									\
-	int _rc = (rc);							\
-									\
-	if (_rc < 0) {							\
-		fprintf(stderr, "ERROR (%s:%d): %d: "			\
-			format"\n", __FILE__, __LINE__,  _rc,		\
-			##__VA_ARGS__);					\
-		fflush(stderr);						\
-		return -1;						\
-	}								\
-} while (0)
-
-static bool daos_initialized;
-static int num_threads;
-static pthread_mutex_t daos_mutex = PTHREAD_MUTEX_INITIALIZER;
-daos_handle_t poh, coh;
-dfs_t *dfs;
+static bool		daos_initialized;
+static int		num_threads;
+static pthread_mutex_t	daos_mutex = PTHREAD_MUTEX_INITIALIZER;
+daos_handle_t		poh;
+daos_handle_t		coh;
+dfs_t			*dfs;
 
 struct daos_iou {
 	struct io_u	*io_u;
@@ -80,8 +48,7 @@ struct daos_iou {
 };
 
 struct daos_data {
-	dfs_t		*dfs;
-	daos_handle_t	poh, coh, eqh;
+	daos_handle_t	 eqh;
 	dfs_obj_t	*obj;
 	struct io_u	**io_us;
 	int		queued;
@@ -140,120 +107,209 @@ static struct fio_option options[] = {
 };
 
 static int
-daos_fio_init(struct thread_data *td)
+daos_fio_global_init(struct thread_data *td)
 {
 	struct daos_fio_options	*eo = td->eo;
-	struct daos_data	*dd;
 	uuid_t			pool_uuid, co_uuid;
 	d_rank_list_t		*svcl = NULL;
 	daos_pool_info_t	pool_info;
 	daos_cont_info_t	co_info;
-	int			rc;
+	int			rc = 0;
+
+	if (!eo->pool || !eo->cont || !eo->svcl) {
+		log_err("Missing required DAOS options\n");
+		return EINVAL;
+	}
+
+	rc = daos_init();
+	if (rc != -DER_ALREADY && rc) {
+		log_err("Failed to initialize daos %d\n", rc);
+		td_verror(td, EINVAL, "daos_init");
+		return EINVAL;
+	}
+
+	rc = uuid_parse(eo->pool, pool_uuid);
+	if (rc) {
+		log_err("Failed to parse 'Pool uuid': %s\n", eo->pool);
+		td_verror(td, EINVAL, "uuid_parse(eo->pool)");
+		return EINVAL;
+	}
+
+	rc = uuid_parse(eo->cont, co_uuid);
+	if (rc) {
+		log_err("Failed to parse 'Cont uuid': %s\n", eo->cont);
+		td_verror(td, EINVAL, "uuid_parse(eo->cont)");
+		return EINVAL;
+	}
+
+	svcl = daos_rank_list_parse(eo->svcl, ":");
+	if (svcl == NULL) {
+		log_err("Failed to parse svcl\n");
+		td_verror(td, EINVAL, "daos_rank_list_parse");
+		return EINVAL;
+	}
+
+	rc = daos_pool_connect(pool_uuid, NULL, svcl, DAOS_PC_RW,
+			&poh, &pool_info, NULL);
+	d_rank_list_free(svcl);
+	if (rc) {
+		log_err("Failed to connect to pool %d\n", rc);
+		td_verror(td, EINVAL, "daos_pool_connect");
+		return EINVAL;
+	}
+
+	rc = daos_cont_open(poh, co_uuid, DAOS_COO_RW, &coh, &co_info, NULL);
+	if (rc) {
+		log_err("Failed to open container: %d\n", rc);
+		td_verror(td, EINVAL, "daos_cont_open");
+		(void) daos_pool_disconnect(poh, NULL);
+		return EINVAL;
+	}
+
+	rc = dfs_mount(poh, coh, O_RDWR, &dfs);
+	if (rc) {
+		log_err("Failed to mount DFS namespace: %d\n", rc);
+		td_verror(td, EINVAL, "dfs_mount");
+		(void) daos_pool_disconnect(poh, NULL);
+		(void) daos_cont_close(coh, NULL);
+		return EINVAL;
+	}
+
+	log_info("[Init] pool_id=%s, container_id=%s, svcl=%s, chunk_size=%ld\n",
+		 eo->pool, eo->cont, eo->svcl, eo->chsz);
+
+	return 0;
+}
+
+static void
+daos_fio_global_cleanup()
+{
+	int rc;
+
+	rc = dfs_umount(dfs);
+	if (rc)
+		log_err("failed to umount dfs: %d\n", rc);
+	rc = daos_cont_close(coh, NULL);
+	if (rc)
+		log_err("failed to close container: %d\n", rc);
+	rc = daos_pool_disconnect(poh, NULL);
+	if (rc)
+		log_err("failed to disconnect pool: %d\n", rc);
+	rc = daos_fini();
+	if (rc)
+		log_err("failed to finalize daos: %d\n", rc);
+}
+
+static int
+daos_fio_setup(struct thread_data *td)
+{
+	return 0;
+}
+
+static int
+daos_fio_init(struct thread_data *td)
+{
+	struct daos_data	*dd;
+	int			rc = 0;
 
 	pthread_mutex_lock(&daos_mutex);
-	num_threads++;
 
 	/* Allocate space for DAOS-related data */
 	dd = malloc(sizeof(*dd));
-	dd->queued = 0;
-	dd->num_ios = td->o.iodepth;
-	dd->io_us = calloc(dd->num_ios, sizeof(struct io_u *));
-	if (dd->io_us == NULL)
-		ERR("Failed to allocate IO queue\n");
+	if (dd == NULL) {
+		log_err("Failed to allocate DAOS-private data\n");
+		rc = ENOMEM;
+		goto out;
+	}
 
+	dd->queued	= 0;
+	dd->num_ios	= td->o.iodepth;
+	dd->io_us	= calloc(dd->num_ios, sizeof(struct io_u *));
+	if (dd->io_us == NULL) {
+		log_err("Failed to allocate IO queue\n");
+		rc = ENOMEM;
+		goto out;
+	}
+
+	/* initialize DAOS stack if not already up */
 	if (!daos_initialized) {
-		if (!eo->pool || !eo->cont || !eo->svcl)
-			ERR("Missing required DAOS options\n");
-
-		rc = daos_init();
-		if (rc != -DER_ALREADY && rc)
-			DCHECK(rc, "Failed to initialize daos");
-
-		rc = uuid_parse(eo->pool, pool_uuid);
-		DCHECK(rc, "Failed to parse 'Pool uuid': %s", eo->pool);
-		rc = uuid_parse(eo->cont, co_uuid);
-		DCHECK(rc, "Failed to parse 'Cont uuid': %s", eo->cont);
-		svcl = daos_rank_list_parse(eo->svcl, ":");
-		if (svcl == NULL)
-			ERR("Failed to allocate svcl");
-
-		rc = daos_pool_connect(pool_uuid, NULL, svcl, DAOS_PC_RW,
-				       &poh, &pool_info, NULL);
-		d_rank_list_free(svcl);
-		DCHECK(rc, "Failed to connect to pool");
-
-		rc = daos_cont_open(poh, co_uuid, DAOS_COO_RW, &coh, &co_info, NULL);
-		DCHECK(rc, "Failed to open container");
-
-		rc = dfs_mount(poh, coh, O_RDWR, &dfs);
-		DCHECK(rc, "Failed to mount DFS namespace");
+		rc = daos_fio_global_init(td);
+		if (rc)
+			goto out;
 		daos_initialized = true;
 	}
 
 	rc = daos_eq_create(&dd->eqh);
-	DCHECK(rc, "Failed to create event queue");
-
-	dd->poh.cookie = poh.cookie;
-	dd->coh.cookie = coh.cookie;
-	dd->dfs = dfs;
+	if (rc) {
+		log_err("Failed to create event queue: %d\n", rc);
+		td_verror(td, EINVAL, "daos_eq_create");
+		rc = EINVAL;
+		goto out;
+	}
 
 	td->io_ops_data = dd;
-	printf("[Init] pool_id=%s, container_id=%s, svcl=%s, chunk_size=%ld\n",
-	       eo->pool, eo->cont, eo->svcl, eo->chsz);
-
+	num_threads++;
+out:
+	if (rc) {
+		if (dd && dd->io_us)
+			free(dd->io_us);
+		if (dd)
+			free(dd);
+		if (num_threads == 0 && daos_initialized) {
+			daos_fio_global_cleanup();
+			daos_initialized = false;
+		}
+	}
 	pthread_mutex_unlock(&daos_mutex);
-	return 0;
+	return rc;
 }
 
 static void
 daos_fio_cleanup(struct thread_data *td)
 {
-	struct daos_data *dd = td->io_ops_data;
-	int rc;
+	struct daos_data	*dd = td->io_ops_data;
+	int			rc;
+
+	if (td->io_ops_data == NULL)
+		return;
+
+	rc = daos_eq_destroy(dd->eqh, DAOS_EQ_DESTROY_FORCE);
+	if (rc < 0)
+		log_err("failed to destroy event queue: %d\n", rc);
+
+	free(dd->io_us);
+	free(dd);
 
 	pthread_mutex_lock(&daos_mutex);
 	num_threads--;
-
-	if (num_threads != 0) {
-		rc = daos_eq_destroy(dd->eqh, DAOS_EQ_DESTROY_FORCE);
-		ERR_PRINT(rc < 0, "failed to destroy event queue.");
-		free(dd->io_us);
-		free(dd);
-		pthread_mutex_unlock(&daos_mutex);
-		return;
-	}
-
-	rc = dfs_umount(dd->dfs);
-	ERR_PRINT(rc, "failed to umount dfs.");
-	rc = daos_cont_close(dd->coh, NULL);
-	ERR_PRINT(rc, "failed to close container.");
-	rc = daos_pool_disconnect(dd->poh, NULL);
-	ERR_PRINT(rc, "failed to disconnect pool.");
-	rc = daos_eq_destroy(dd->eqh, DAOS_EQ_DESTROY_FORCE);
-	ERR_PRINT(rc < 0, "failed to destroy event queue.");
-	rc = daos_fini();
-	ERR_PRINT(rc, "failed to finalize daos.");
-	free(dd->io_us);
-	free(dd);
-	daos_initialized = false;
+	if (daos_initialized && num_threads == 0) {
+		daos_fio_global_cleanup();
+		daos_initialized = false;
+	}		
 	pthread_mutex_unlock(&daos_mutex);
 }
 
 static int
 daos_fio_open(struct thread_data *td, struct fio_file *f)
 {
-	char *file_name = f->file_name;
-	struct daos_data *dd = td->io_ops_data;
-	mode_t mode = S_IFREG | S_IRWXU | S_IRWXG | S_IRWXO;
-	int fd_oflag = O_CREAT | O_RDWR;
-	daos_oclass_id_t oc = OC_SX;
-	struct daos_fio_options *eo = td->eo;
-	daos_size_t chunk_size = eo->chsz ? eo->chsz : 0;
-	int rc;
+	struct daos_data	*dd = td->io_ops_data;
+	struct daos_fio_options	*eo = td->eo;
+	int			rc;
 
-	rc = dfs_open(dd->dfs, NULL, file_name, mode, fd_oflag,
-		      oc, chunk_size, NULL, &dd->obj);
-	DCHECK(rc, "dfs_open() failed.");
+	rc = dfs_open(dfs,
+		      NULL,
+		      f->file_name,
+		      S_IFREG | S_IRWXU | S_IRWXG | S_IRWXO,
+		      O_CREAT | O_RDWR,
+		      OC_SX,
+		      eo->chsz ? eo->chsz : 0,
+		      NULL,
+		      &dd->obj);
+	if (rc) {
+		log_err("Failed to open file: %d\n", rc);
+		td_verror(td, rc, "dfs_open");
+		return rc;
+	}
 
 	return 0;
 }
@@ -261,12 +317,15 @@ daos_fio_open(struct thread_data *td, struct fio_file *f)
 static int
 daos_fio_unlink(struct thread_data *td, struct fio_file *f)
 {
-	char *file_name = f->file_name;
-	struct daos_data *dd = td->io_ops_data;
-	int rc;
+	struct daos_data	*dd = td->io_ops_data;
+	int			rc;
 
-	rc = dfs_remove(dd->dfs, NULL, file_name, false, NULL);
-	DCHECK(rc, "dfs_remove() failed.");
+	rc = dfs_remove(dfs, NULL, f->file_name, false, NULL);
+	if (rc) {
+		log_err("Failed to remove file: %d\n", rc);
+		td_verror(td, rc, "dfs_remove");
+		return rc;
+	}
 
 	return 0;
 }
@@ -295,8 +354,8 @@ daos_fio_io_u_init(struct thread_data *td, struct io_u *io_u)
 
 	io = malloc(sizeof(struct daos_iou));
 	if (!io) {
-		td_verror(td, errno, "malloc");
-		return 1;
+		td_verror(td, ENOMEM, "malloc");
+		return ENOMEM;
 	}
 	io->io_u = io_u;
 	io_u->engine_data = io;
@@ -311,8 +370,9 @@ daos_fio_event(struct thread_data *td, int event)
 	return dd->io_us[event];
 }
 
-static int daos_fio_getevents(struct thread_data *td, unsigned int min,
-			      unsigned int max, const struct timespec *t)
+static int
+daos_fio_getevents(struct thread_data *td, unsigned int min,
+		   unsigned int max, const struct timespec *t)
 {
 	struct daos_data *dd = td->io_ops_data;
 	daos_event_t *evp[max];
@@ -321,18 +381,22 @@ static int daos_fio_getevents(struct thread_data *td, unsigned int min,
 	int rc;
 
 	while (events < min) {
-		rc = daos_eq_poll(dd->eqh, 1, DAOS_EQ_NOWAIT, max, evp);
-		DCHECK(rc < 0, "event poll failed with %d", rc);
+		rc = daos_eq_poll(dd->eqh, 0, DAOS_EQ_NOWAIT, max, evp);
+		if (rc < 0) {
+			log_err("Event poll failed: %d\n", rc);
+			td_verror(td, EIO, "daos_eq_poll");
+			return events;
+		}
 
 		for (i = 0; i < rc; i++) {
 			struct daos_iou	*io;
 			struct io_u	*io_u;
 
 			io = container_of(evp[i], struct daos_iou, ev);
-			DCHECK(!io->complete,
-			       "completion on already completed I/O");
-			io_u = io->io_u;
+			if (io->complete)
+				log_err("Completion on already completed I/O\n");
 
+			io_u = io->io_u;
 			if (io->ev.ev_error)
 				io_u->error = io->ev.ev_error;
 			else
@@ -368,28 +432,37 @@ daos_fio_queue(struct thread_data *td, struct io_u *io_u)
 
 	io->complete = false;
 	rc = daos_event_init(&io->ev, dd->eqh, NULL);
-	DCHECK(rc, "daos_event_init() failed.");
+	if (rc) {
+		log_err("Event init failed: %d\n", rc);
+		io_u->error = rc;
+		return FIO_Q_COMPLETED;
+	}
 
 	switch (io_u->ddir) {
 	case DDIR_WRITE:
-		rc = dfs_write(dd->dfs, dd->obj, &io->sgl, offset, &io->ev);
+		rc = dfs_write(dfs, dd->obj, &io->sgl, offset, &io->ev);
 		if (rc) {
-			ERR_PRINT(rc, "dfs_write failed.");
+			log_err("dfs_write failed: %d\n", rc);
 			io_u->error = rc;
 			return FIO_Q_COMPLETED;
 		}
 		break;
 	case DDIR_READ:
-		rc = dfs_read(dd->dfs, dd->obj, &io->sgl, offset, &ret,
+		rc = dfs_read(dfs, dd->obj, &io->sgl, offset, &ret,
 			      &io->ev);
 		if (rc) {
-			ERR_PRINT(rc, "dfs_read failed.");
+			log_err("dfs_read failed: %d\n", rc);
 			io_u->error = rc;
 			return FIO_Q_COMPLETED;
 		}
 		break;
+	case DDIR_SYNC:
+		io_u->error = 0;
+		return FIO_Q_COMPLETED;
 	default:
-		ERR("Invalid IO type\n");
+		dprint(FD_IO, "Invalid IO type: %d\n", io_u->ddir);
+		io_u->error = -DER_INVAL;
+		return FIO_Q_COMPLETED;
 	}
 
 	dd->queued++;
@@ -407,8 +480,12 @@ daos_fio_get_file_size(struct thread_data *td, struct fio_file *f)
 	if (!daos_initialized)
 		return 0;
 
-	rc = dfs_stat(dd->dfs, NULL, file_name, &stbuf);
-	DCHECK(rc, "dfs_stat() failed.");
+	rc = dfs_stat(dfs, NULL, file_name, &stbuf);
+	if (rc) {
+		log_err("dfs_stat failed: %d\n", rc);
+		td_verror(td, rc, "dfs_stat");
+		return rc;
+	}
 
 	f->real_file_size = stbuf.st_size;
 	return 0;
@@ -421,7 +498,11 @@ daos_fio_close(struct thread_data *td, struct fio_file *f)
 	int rc;
 
 	rc = dfs_release(dd->obj);
-	DCHECK(rc, "dfs_release() Failed");
+	if (rc) {
+		log_err("dfs_release failed: %d\n", rc);
+		td_verror(td, rc, "dfs_release");
+		return rc;
+	}
 
 	return 0;
 }
@@ -435,7 +516,8 @@ daos_fio_prep(struct thread_data fio_unused *td, struct io_u *io_u)
 struct ioengine_ops ioengine = {
 	.name			= "fio_daos_dfs_async",
 	.version		= FIO_IOOPS_VERSION,
-	.flags			= FIO_DISKLESSIO | FIO_NODISKUTIL | FIO_RAWIO,
+	.flags			= FIO_DISKLESSIO | FIO_NODISKUTIL,
+	.setup			= daos_fio_setup,
 	.init			= daos_fio_init,
 	.prep			= daos_fio_prep,
 	.cleanup		= daos_fio_cleanup,
@@ -452,4 +534,3 @@ struct ioengine_ops ioengine = {
 	.option_struct_size	= sizeof(struct daos_fio_options),
 	.options		= options,
 };
-
