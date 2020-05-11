@@ -9,19 +9,18 @@
 
 # Modify FIO_DIR and DAOS_DIR to the root path of fio and daos, respectively
 
-FIO_DIR := /path/to/fio
-DAOS_DIR := /path/to/daos
-CART_DIR := /path/to/cart
+FIO_DIR := /home/mschaara/source/posix-box/fio/
+DAOS_DIR := /home/mschaara/install/daos
 
-SRC := daos_fio.c
-BIN := daos_fio
+SRC := daos_fio_q_c.c
+BIN := daos_fio_q_c
 SRC2 := daos_fio_async.c
 BIN2 := daos_fio_async
 
 CC := gcc
-FLAGS := -rdynamic -Wl,-z,nodelete -fPIC
-LDFLAGS := -shared -L${CART_DIR}/lib -L${DAOS_DIR}/lib64 -ldl -ldaos -ldfs -ldaos_common -lgurt -luuid
-INCLUDES := -I${FIO_DIR} -include ${FIO_DIR}/config-host.h -I${DAOS_DIR}/include -I${CART_DIR}/include
+FLAGS := -rdynamic -Wl,-z,nodelete -fPIC -g
+LDFLAGS := -shared -L${DAOS_DIR}/lib64 -ldl -ldaos -ldfs -ldaos_common -lgurt -luuid
+INCLUDES := -I${FIO_DIR} -include ${FIO_DIR}/config-host.h -I${DAOS_DIR}/include 
 DEFINES := -D_GNU_SOURCE
 
 build:
