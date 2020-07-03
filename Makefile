@@ -9,10 +9,6 @@
 
 # Modify FIO_DIR and DAOS_DIR to the root path of fio and daos, respectively
 
-FIO_DIR := /path/to/fio
-DAOS_DIR := /path/to/daos
-CART_DIR := /path/to/cart
-
 SRC := daos_fio.c
 BIN := daos_fio
 SRC2 := daos_fio_async.c
