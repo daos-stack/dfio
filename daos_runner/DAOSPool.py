@@ -14,7 +14,7 @@ class DAOSPool(DAOSEnv):
 		self.agg_mode = agg_mode
 		
 	def create_pool(self):
-		print ("\n****Creating Pool for this object\n")
+		print ("\n****Creating Pool for this object")
 		cmd = self.dmg +" -o " + self.client_config
 		cmd += " pool create -s="+ self.scm_size + " -n="
 		cmd += self.nvme_size
@@ -32,12 +32,12 @@ class DAOSPool(DAOSEnv):
 				self.pool_uuid = columns[index].rstrip(',')
 			if column.lower() == "replicas:":
 				self.replicas = columns[index].rstrip(',')
-		print ("****SUCCESS: Pool created\n")
+		print ("****SUCCESS: Pool created")
 		print ("UUID: "+ self.pool_uuid +" replicas: "+ str(self.replicas))
 		
 
 	def destroy_pool(self):
-		print ("\n****Destroy pool " + self.pool_uuid + "\n"); 
+		print ("\n****Destroy pool " + self.pool_uuid); 
 		try:
 			val = self.pool_uuid
 		except AttributeError:

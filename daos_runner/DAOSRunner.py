@@ -1,5 +1,5 @@
 #! /usr/bin/python3.6
-import os, sys, subprocess
+import os, sys, subprocess, re
 import pprint, shlex, time, uuid
 from pathlib import Path
 from subprocess import Popen,PIPE
@@ -20,7 +20,7 @@ class DAOSRunner(DAOSPool):
 		args = shlex.split(cmd)
 		proc = subprocess.Popen(args)
 		self.agent_pid = proc.pid
-		print ("\n****Start daos agent PID\n", self.agent_pid)
+		print ("\n****Start daos agent PID: ", self.agent_pid)
 		time.sleep(3) # sleep a bit for pretty print
 
 	def stop_agent(self):
@@ -68,7 +68,6 @@ class DAOSRunner(DAOSPool):
 		except subprocess.CalledProcessError as error:
 			print("Could not create container -- failure")
 			exit()
-
 		print (res.decode(sys.stdout.encoding).strip())
 		
 
@@ -94,5 +93,54 @@ class DAOSRunner(DAOSPool):
 		else:
 			print ("ERROR: No container created for this object");
 		return
-					
 
+	def setup_fio_config(self, config_file, blocksize, iodepth, daos_chunk, op):
+		f = open(config_file, "w+")
+		f.write("[global]\n")
+		plugin="ioengine=external:"+ self.fio_plugin + "\n"
+		pool="daos_pool="+ self.pool_uuid + "\n"
+		cont="daos_cont="+ self.cont_uuid + "\n"
+		svcl="daos_svcl="+ self.replicas + "\n"
+		chsz="daos_chsz="+ str(daos_chunk) + "\n"
+		depth="iodepth=" + str(iodepth)
+		njobs="numjobs="+ str(self.jobs) + "\n"
+		f_op="rw="+ op + "\n"
+		f_iosize="size="+ str(self.iosize) + "\n"
+		bsize="bs="+ str(blocksize) + "\n"
+		
+		lines = [plugin, pool, cont, svcl, chsz]
+		f.writelines(lines)
+		f.write("group_reporting=1\nverify=0\ndirect=0\n%s\n" % depth)
+		f.write("percentile_list=99.0:99.9:99.99:99.999:99.9999:100\n")
+		f.write("numa_cpu_nodes=0\nnuma_mem_policy=bind:0\n")
+		f.write("\n\n\n[test1]\n")
+		lines = [njobs, f_op, bsize, f_iosize]
+		f.writelines(lines)
+
+	
+
+	def run_fio_test(self, config_file, output_dir, output_file):
+		myenv = os.environ.copy()
+		myenv['LD_PRELOAD'] = self.fio_plugin
+		fio_cmd = self.fio + " " + config_file
+		fio_cmd += " --output=" + output_dir + "/" + output_file
+		fio_cmd += " --eta=always"
+		print(fio_cmd)
+		process = subprocess.Popen(fio_cmd, env=myenv, shell=True,
+					stdout=subprocess.PIPE, universal_newlines=True)
+		erase = '\x1b[1A\x1b[2K'
+		while True:
+			line = 	process.stdout.readline()
+			if line == '' and process.poll() is not None:
+				break
+			sys.stdout.write(erase + line)
+			sys.stdout.flush()
+
+		output = process.communicate()[0]
+		ret    = process.returncode
+		if ret is 0:
+			print (output)
+		else:
+			raise ProcessException(fio_cmd, ret, output)
+
+		return
