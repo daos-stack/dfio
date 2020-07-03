@@ -1,0 +1,28 @@
+test1: (g=0): rw=randwrite, bs=(R) 4096B-4096B, (W) 4096B-4096B, (T) 4096B-4096B, ioengine=fio_daos_dfs_async, iodepth=16
+...
+fio-3.20
+Starting 32 processes
+
+test1: (groupid=0, jobs=32): err= 0: pid=47656: Fri Jul  3 00:24:35 2020
+  write: IOPS=417k, BW=1631MiB/s (1710MB/s)(384GiB/241119msec); 0 zone resets
+    slat (usec): min=4, max=1383, avg=10.54, stdev= 2.41
+    clat (usec): min=7, max=204438, avg=1154.41, stdev=2260.53
+     lat (usec): min=41, max=204477, avg=1164.95, stdev=2260.66
+    clat percentiles (msec):
+     | 99.0000th=[   10], 99.9000th=[   29], 99.9900th=[   41],
+     | 99.9990th=[   53], 99.9999th=[  131], 100.0000th=[  205]
+   bw (  MiB/s): min=  998, max= 4609, per=100.00%, avg=1715.86, stdev=19.30, samples=14634
+   iops        : min=255509, max=1180028, avg=439259.45, stdev=4939.50, samples=14634
+  lat (usec)   : 10=0.01%, 20=0.01%, 50=0.40%, 100=9.91%, 250=22.77%
+  lat (usec)   : 500=21.01%, 750=11.48%, 1000=7.01%
+  lat (msec)   : 2=12.16%, 4=7.56%, 10=6.77%, 20=0.65%, 50=0.27%
+  lat (msec)   : 100=0.01%, 250=0.01%
+  cpu          : usr=85.18%, sys=14.75%, ctx=33647, majf=0, minf=12987
+  IO depths    : 1=0.1%, 2=0.1%, 4=0.1%, 8=0.1%, 16=100.0%, 32=0.0%, >=64=0.0%
+     submit    : 0=0.0%, 4=100.0%, 8=0.0%, 16=0.0%, 32=0.0%, 64=0.0%, >=64=0.0%
+     complete  : 0=0.0%, 4=100.0%, 8=0.0%, 16=0.1%, 32=0.0%, 64=0.0%, >=64=0.0%
+     issued rwts: total=0,100663296,0,0 short=0,0,0,0 dropped=0,0,0,0
+     latency   : target=0, window=0, percentile=100.00%, depth=16
+
+Run status group 0 (all jobs):
+  WRITE: bw=1631MiB/s (1710MB/s), 1631MiB/s-1631MiB/s (1710MB/s-1710MB/s), io=384GiB (412GB), run=241119-241119msec

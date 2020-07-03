@@ -1,0 +1,28 @@
+test1: (g=0): rw=randread, bs=(R) 4096B-4096B, (W) 4096B-4096B, (T) 4096B-4096B, ioengine=fio_daos_dfs_async, iodepth=16
+...
+fio-3.20
+Starting 32 processes
+
+test1: (groupid=0, jobs=32): err= 0: pid=48913: Fri Jul  3 00:27:27 2020
+  read: IOPS=595k, BW=2324MiB/s (2436MB/s)(384GiB/169231msec)
+    slat (usec): min=5, max=2234, avg=11.79, stdev= 3.14
+    clat (usec): min=11, max=135300, avg=766.38, stdev=2121.07
+     lat (usec): min=37, max=135310, avg=778.17, stdev=2121.26
+    clat percentiles (msec):
+     | 99.0000th=[   11], 99.9000th=[   28], 99.9900th=[   37],
+     | 99.9990th=[   46], 99.9999th=[  112], 100.0000th=[  136]
+   bw (  MiB/s): min= 1561, max= 6022, per=100.00%, avg=2533.61, stdev=27.61, samples=9680
+   iops        : min=399626, max=1541715, avg=648599.46, stdev=7068.67, samples=9680
+  lat (usec)   : 20=0.01%, 50=1.42%, 100=16.24%, 250=39.54%, 500=20.98%
+  lat (usec)   : 750=6.12%, 1000=2.41%
+  lat (msec)   : 2=3.10%, 4=7.30%, 10=1.85%, 20=0.77%, 50=0.27%
+  lat (msec)   : 100=0.01%, 250=0.01%
+  cpu          : usr=88.99%, sys=10.93%, ctx=25876, majf=0, minf=14376
+  IO depths    : 1=0.1%, 2=0.1%, 4=0.1%, 8=0.1%, 16=100.0%, 32=0.0%, >=64=0.0%
+     submit    : 0=0.0%, 4=100.0%, 8=0.0%, 16=0.0%, 32=0.0%, 64=0.0%, >=64=0.0%
+     complete  : 0=0.0%, 4=100.0%, 8=0.0%, 16=0.1%, 32=0.0%, 64=0.0%, >=64=0.0%
+     issued rwts: total=100663296,0,0,0 short=0,0,0,0 dropped=0,0,0,0
+     latency   : target=0, window=0, percentile=100.00%, depth=16
+
+Run status group 0 (all jobs):
+   READ: bw=2324MiB/s (2436MB/s), 2324MiB/s-2324MiB/s (2436MB/s-2436MB/s), io=384GiB (412GB), run=169231-169231msec
