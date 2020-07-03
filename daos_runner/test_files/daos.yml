@@ -1,0 +1,7 @@
+hostlist: ['10.23.104.52:10001']
+access_points: ['10.23.104.52:10001']
+port: 10001
+transport_config:
+  allow_insecure: true
+runtime_dir: /tmp/vishwana/daos_agent
+log_file: /tmp/vishwana/daos_agent.log

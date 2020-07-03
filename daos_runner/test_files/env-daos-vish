@@ -1,0 +1,27 @@
+#!/bin/bash
+
+DAOS=/home/vishwana/daos/install
+DFIO=/home/vishwana/dfio
+
+export LD_LIBRARY_PATH=/usr/lib64/:$LD_LIBRARY_PATH
+export CPATH=/usr/include/:$CPATH
+
+export ABT_ENV_MAX_NUM_XSTREAMS=100
+export ABT_MAX_NUM_XSTREAMS=100
+
+## DAOS lib
+export PATH=$DAOS/bin:/usr/lib64/mpich/bin:$DFIO:$PATH
+export LD_LIBRARY_PATH=$DAOS/lib:$DAOS/lib64/:$DAOS/lib64/daos_srv:/usr/lib64/mpich/lib/:$LD_LIBRARY_PATH
+export CPATH=$DAOS/include/:$CPATH
+export C_INCLUDE_PATH=$DAOS/include:/usr/include/mpich-x86_64/:$C_INCLUDE_PATH
+
+# DAOS Agent
+export DAOS_AGENT_DRPC_DIR=/tmp/vishwana/daos_agent/
+
+## Use IB provider
+export CRT_PHY_ADDR_STR="ofi+verbs;ofi_rxm"
+export OFI_DOMAIN=mlx5_0
+export OFI_INTERFACE=enp175s0
+
+## CLIENT Debug file
+export D_LOG_FILE=/tmp/vishwana/daos_client.log
