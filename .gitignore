@@ -50,3 +50,7 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+daos_fio
+daos_fio_async
+.cache_vars
