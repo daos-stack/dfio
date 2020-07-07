@@ -26,6 +26,12 @@ class DaosFioRunner(DaosPool):
         self.cont_sys = None
         self.fstype = None
 
+    def set_num_jobs(self, jobs):
+        self.jobs = jobs
+
+    def set_iosize(self, iosize):
+        self.iosize = iosize
+
     def start_agent(self):
         """ Start a DAOS agent asnynchronous """
         cmd = self.daos_agent + " -o " + self.client_config
@@ -133,7 +139,7 @@ class DaosFioRunner(DaosPool):
         cfile.write("\n\n\n[test1]\n")
         lines = [njobs, f_op, bsize, f_iosize]
         cfile.writelines(lines)
-
+        print("Completed generating fio config file at", config_file)
 
 
     def run_fio_test(self, config_file, output_dir, output_file):
@@ -141,6 +147,9 @@ class DaosFioRunner(DaosPool):
             Launch and track live  output to screen and capture in
             separate  file
         """
+        if not os.path.exists(output_dir):
+           os.makedirs(output_dir)
+
         myenv = os.environ.copy()
         myenv['LD_PRELOAD'] = self.fio_plugin
         fio_cmd = self.fio + " " + config_file
