@@ -28,6 +28,7 @@
 #include <optgroup.h>
 
 #include <daos.h>
+#include <daos/object.h>
 #include <daos_fs.h>
 #include <gurt/common.h>
 #include <gurt/hash.h>
@@ -295,13 +296,15 @@ daos_fio_open(struct thread_data *td, struct fio_file *f)
 	struct daos_data	*dd = td->io_ops_data;
 	struct daos_fio_options	*eo = td->eo;
 	int			rc;
+	unsigned int		oc =
+		(DAOS_OC_R1S_SPEC_RANK | (td->subjob_number << 20));
 
 	rc = dfs_open(dfs,
 		      NULL,
 		      f->file_name,
 		      S_IFREG | S_IRWXU | S_IRWXG | S_IRWXO,
 		      O_CREAT | O_RDWR,
-		      OC_SX,
+		      oc,
 		      eo->chsz ? eo->chsz : 0,
 		      NULL,
 		      &dd->obj);
