@@ -15,7 +15,8 @@ def main():
         sys.exit(-1)
 
     # Using all defaults for  cont_uuid, fstype, cont_chunk, cont_sys
-    test_inputs = ["1G", "2G", "4G", "8G", "16G", "20G"]
+#    test_inputs = ["1G", "2G", "4G", "8G", "16G", "20G"]
+    test_inputs = ["1G", "2G"]
     for i in test_inputs:
          fiotest.set_iosize(i)
 
