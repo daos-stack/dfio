@@ -23,6 +23,20 @@ class DaosPool(DaosBashEnv):
         self.pool_uuid = None
         self.replicas = None
 
+    def set_reclaim_mode(self):
+        """ Set aggregation mode for reclaiming space """
+        print("***** Setting aggregation mode to %s******" % self.agg_mode)
+        print("UUID: "+ self.pool_uuid +" replicas: "+ str(self.replicas))
+        cmd = self.dmg +" -o " + self.client_config
+        cmd += " pool set-prop --pool=" + self.pool_uuid
+        cmd += " -n=reclaim -v=" + self.agg_mode
+        args = shlex.split(cmd)
+        try:
+            subprocess.check_output(args)
+        except subprocess.CalledProcessError as error:
+            print("Could not create pool -- failure", error)
+            sys.exit(1)
+
     def create_pool(self):
         """ Wrapper for dmg pool create function """
         print("\n****Creating Pool for this object")
@@ -44,24 +58,33 @@ class DaosPool(DaosBashEnv):
             if column.lower() == "replicas:":
                 self.replicas = columns[index].rstrip(',')
         print("****SUCCESS: Pool created")
-        print("UUID: "+ self.pool_uuid +" replicas: "+ str(self.replicas))
-
+        self.set_reclaim_mode()
 
     def destroy_pool(self):
         """ wrapper for  dmg pool  destroy """
-        print("\n****Destroy pool " + self.pool_uuid)
         try:
-            print(self.pool_uuid)
+            print("\n****Destroy pool " + self.pool_uuid)
         except AttributeError:
             print("ERROR: No pool created for this object\n")
             return
 
         cmd = self.dmg +" -o " + self.client_config
-        cmd = cmd + " pool destroy --pool="+self.pool_uuid
+        cmd = cmd + " pool destroy --pool="+ self.pool_uuid
 
         stream = os.popen(cmd)
         pool_output = stream.read()
         print(pool_output)
+
+    def pool_query(self):
+        """ print the pool status """
+        try:
+            print("\n****Pool query for " + self.pool_uuid)
+        except AttributeError:
+            print("ERROR: No pool to print status\n")
+            return
+
+        cmd = self.dmg +" -o " + self.client_config
+        cmd = cmd + " pool query --pool="+ self.pool_uuid
 
     def get_pool_uuid(self):
         """ return pool uuid for this object """
