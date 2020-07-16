@@ -28,6 +28,7 @@
 #include <optgroup.h>
 
 #include <daos.h>
+#include <daos/object.h>
 #include <daos_fs.h>
 #include <gurt/common.h>
 #include <gurt/hash.h>
@@ -285,7 +286,7 @@ daos_fio_cleanup(struct thread_data *td)
 	if (daos_initialized && num_threads == 0) {
 		daos_fio_global_cleanup();
 		daos_initialized = false;
-	}		
+	}
 	pthread_mutex_unlock(&daos_mutex);
 }
 
@@ -295,13 +296,15 @@ daos_fio_open(struct thread_data *td, struct fio_file *f)
 	struct daos_data	*dd = td->io_ops_data;
 	struct daos_fio_options	*eo = td->eo;
 	int			rc;
+	unsigned int		oc = OC_SX;
 
+	printf("Opening new file\n");
 	rc = dfs_open(dfs,
 		      NULL,
 		      f->file_name,
 		      S_IFREG | S_IRWXU | S_IRWXG | S_IRWXO,
 		      O_CREAT | O_RDWR,
-		      OC_SX,
+		      oc,
 		      eo->chsz ? eo->chsz : 0,
 		      NULL,
 		      &dd->obj);
@@ -377,11 +380,12 @@ daos_fio_getevents(struct thread_data *td, unsigned int min,
 	struct daos_data *dd = td->io_ops_data;
 	daos_event_t *evp[max];
 	unsigned int events = 0;
+	int wait = DAOS_EQ_NOWAIT;
 	int i;
 	int rc;
 
 	while (events < min) {
-		rc = daos_eq_poll(dd->eqh, 0, DAOS_EQ_NOWAIT, max, evp);
+		rc = daos_eq_poll(dd->eqh, 0, wait, max - events, evp);
 		if (rc < 0) {
 			log_err("Event poll failed: %d\n", rc);
 			td_verror(td, EIO, "daos_eq_poll");
@@ -408,6 +412,9 @@ daos_fio_getevents(struct thread_data *td, unsigned int min,
 			io->complete = true;
 			events++;
 		}
+
+		if (rc == 0 && events < min)
+			wait = DAOS_EQ_WAIT;
 	}
 
 	return events;
