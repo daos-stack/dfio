@@ -8,7 +8,6 @@
 # portions thereof marked with this legend must also reproduce the markings.
 
 # Modify FIO_DIR and DAOS_DIR to the root path of fio and daos, respectively
-
 SRC := daos_fio.c
 BIN := daos_fio
 SRC2 := daos_fio_async.c
