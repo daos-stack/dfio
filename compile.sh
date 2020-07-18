@@ -7,6 +7,9 @@ function help() {
         echo '  --cart-path=<path>: cart install directory'
         echo '  --daos-path=<path>: daos install directory'
         echo '  --daos-src=<path>: daos src  directory'
+        echo '  --clean		 : clean the repo'
+        echo '  --help           : Print this menu'
+        echo '  --dist-clean     : Clear cache'
         exit 0
 }
 
@@ -36,6 +39,10 @@ for arg in "$@"; do
         daossrc=`echo $arg | sed 's/--daos-src=//'`
         ;;
     --clean)
+	make clean
+        exit
+        ;;
+    --dist-clean)
 	rm $PWD/.cache_vars
         exit
         ;;
@@ -57,9 +64,6 @@ if [ "$#" -ne 4 ]; then
 	help
 	exit -1
 fi
-
-#delete old cache file
-rm $PWD/.cache_vars
 
 echo "export FIO_DIR=${fiopath}" >> .cache_vars
 echo "export CART_DIR=${cartpath}" >> .cache_vars
