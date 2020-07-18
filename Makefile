@@ -17,7 +17,7 @@ BIN2 := daos_fio_async
 CC := gcc
 FLAGS := -rdynamic -Wl,-z,nodelete -fPIC
 LDFLAGS := -shared -L${CART_DIR}/lib -L${DAOS_DIR}/lib64 -ldl -ldaos -ldfs -ldaos_common -lgurt -luuid
-INCLUDES := -I${FIO_DIR} -include ${FIO_DIR}/config-host.h -I${DAOS_DIR}/include -I${CART_DIR}/include
+INCLUDES := -I${FIO_DIR} -include ${FIO_DIR}/config-host.h -I${DAOS_DIR}/include -I${CART_DIR}/include -I${DAOS_SRC}/src/include/ 
 DEFINES := -D_GNU_SOURCE
 
 build:
