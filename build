@@ -23,7 +23,7 @@ function build() {
 		make
 	fi
 	exit 0
-}	
+}
 
 for arg in "$@"; do
     case "$arg" in
