@@ -6,9 +6,12 @@ user-specified DAOS pool and container. Rhis plugin is still under development.
 
 ## Build
 
-- Use compile.sh to build the files, supply appropriate paths demanded by script
-	-- example [./compile.sh  --fio-path=/home/vishwana/daos/_build.external/fio --cart-path=/home/vishwana/daos/install/ --daos-path=/home/vishwana/daos/install/]
-- Use `make clean` to clean the build
+- Use build script to build the files, supply appropriate paths demanded by script
+example:
+	./build --fio-path=/home/vishwana/daos/_build.external/fio/ --cart-path=/home/vishwana/daos/install/ --daos-path=/home/vishwana/daos/install/ --daos-src=/home/vishwana/daos/
+- Once built, the build information is cached, and further builds just needs ./build
+- To trigger make clean use ./build --clean
+- To clear cache and restart build use ./build --dist-clean
 
 ## Usage
 

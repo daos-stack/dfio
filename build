@@ -1,24 +1,25 @@
 #!/bin/sh
 
 function help() {
-	echo 'usage: ./compile.sh [options]'
-        echo 'required options:'
+	echo 'usage: ./build [options]'
+        echo 'required options on an empty dist:'
         echo '  --fio-path=<path>: fio-source directory'
         echo '  --cart-path=<path>: cart install directory'
         echo '  --daos-path=<path>: daos install directory'
         echo '  --daos-src=<path>: daos src  directory'
-        echo '  --clean		 : clean the repo'
-        echo '  --help           : Print this menu'
-        echo '  --dist-clean     : Clear cache'
+	echo ' Other options from build script '
+        echo '  --clean      : clean the repo'
+        echo '  --help       : Print this menu'
+        echo '  --dist-clean : Clear cache'
         exit 0
 }
-
-
 
 function build() {
 	source $PWD/.cache_vars
 	if [ ! -z "$FIO_DIR" ] && [ ! -z "$CART_DIR" ] && [ ! -z "$DAOS_DIR" ]; then
+		echo "Clean"
 		make clean
+		echo "Build"
 		make
 	fi
 	exit 0
@@ -43,7 +44,7 @@ for arg in "$@"; do
         exit
         ;;
     --dist-clean)
-	rm $PWD/.cache_vars
+	rm -f $PWD/.cache_vars
         exit
         ;;
     --help)
@@ -52,12 +53,10 @@ for arg in "$@"; do
    esac
 done
 
-
 if [ -f .cache_vars ]; then
 	echo "Using cached vars"
 	build
 fi
-
 
 #check for input vars if building from scratch
 if [ "$#" -ne 4 ]; then

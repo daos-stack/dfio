@@ -19,7 +19,7 @@ LDFLAGS := -shared -L${CART_DIR}/lib -L${DAOS_DIR}/lib64 -ldl -ldaos -ldfs -ldao
 INCLUDES := -I${FIO_DIR} -include ${FIO_DIR}/config-host.h -I${DAOS_DIR}/include -I${CART_DIR}/include -I${DAOS_SRC}/src/include/ 
 DEFINES := -D_GNU_SOURCE
 
-build:
+all:
 	${CC} -c ${FLAGS} ${INCLUDES} ${DEFINES} ${SRC} -o ${BIN}.o
 	${CC} ${BIN}.o ${LDFLAGS} -o ${BIN}
 	${CC} -c ${FLAGS} ${INCLUDES} ${DEFINES} ${SRC2} -o ${BIN2}.o
