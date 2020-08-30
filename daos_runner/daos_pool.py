@@ -12,11 +12,12 @@ class DaosPool(DaosBashEnv):
         methods to create pool and destroy pool
         Will add more methods to query status and additional pool operations
     """
-    def __init__(self, env, client_config_file, scm_size, nvme_size, agg_mode):
+    def __init__(self, env, client_config_file, agent_config_file, scm_size, nvme_size, agg_mode):
         """ Use the DAOS bash env to create a pool and destroy the pool by
 	    default. Currently doesn't support other shell environments yet"""
         DaosBashEnv.__init__(self, env)
-        self.client_config = os.getcwd() + "/" + client_config_file
+        self.client_config = client_config_file
+        self.agent_config = agent_config_file
         self.scm_size = scm_size
         self.nvme_size = nvme_size
         self.agg_mode = agg_mode

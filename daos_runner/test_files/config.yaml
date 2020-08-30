@@ -1,0 +1,15 @@
+# Yaml config file for FIO runner
+# randread does write before read
+# custom_config : ['/path/to/config'] provides custom configuration options
+env_file_with_path: /home/vishwana/dfio/daos_runner/test_files/env-daos-vish
+control_config_file: /home/vishwana/dfio/daos_runner/test_files/daos_control.yml
+agent_config_file: /home/vishwana/dfio/daos_runner/test_files/daos_agent.yml
+num_jobs: ['32']
+data_size: ['2G']
+scm_size: '180G'
+nvme_size: '640G'
+iodepth: ['1', '2', '4', '8', '16', '128']
+chunk_size: ['1048576']
+iosizes: ['262144']
+agg_mode: 'time'
+io_operations: ['randread'] 

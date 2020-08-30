@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DAOS=/home/vishwana/daos/install
+DAOS=/home/vishwana/daos-new/install
 DFIO=/home/vishwana/dfio
 
 export LD_LIBRARY_PATH=/usr/lib64/:$LD_LIBRARY_PATH
@@ -22,6 +22,8 @@ export DAOS_AGENT_DRPC_DIR=/tmp/vishwana/daos_agent/
 export CRT_PHY_ADDR_STR="ofi+verbs;ofi_rxm"
 export OFI_DOMAIN=mlx5_0
 export OFI_INTERFACE=enp175s0
+export FI_OFI_RXM_USE_SRX=1
+export CRT_TIMEOUT=200
 
 ## CLIENT Debug file
 export D_LOG_FILE=/tmp/vishwana/daos_client.log

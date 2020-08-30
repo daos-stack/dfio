@@ -27,8 +27,9 @@ class DaosBashEnv:
         """Set the environmnet file using envbash supports only bash shell"""
         print("\n\n")
         print("DAOS Test Environment")
-        print("----------------------")
-        print("\u0332".join("Loading env file "), self.env)
+        print("------------------------")
+        print("Loading env file %s", self.env)
+        print("------------------------")
         load_envbash(self.env, override=True, remove=True)
 
 
@@ -44,7 +45,7 @@ class DaosBashEnv:
         self.mpirun = get_tool_path("mpirun")
         self.daos_agent = get_tool_path("daos_agent")
         print("\n\n")
-        print("\u0332".join("Test Tools:"))
+        print("Test Tools:")
         print("FIO: %s"% self.fio)
         print("FIO_plugin: %s"% self.fio_plugin)
         print("DAOS tool: %s"% self.daos)
@@ -54,6 +55,6 @@ class DaosBashEnv:
         print("*******************************************\n\n")
 
     def __init__(self, env):
-        self.env = os.getcwd() + "/" + env
+        self.env = env
         self.set_environ()
         self.get_test_tools()

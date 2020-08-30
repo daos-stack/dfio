@@ -14,10 +14,10 @@ class DaosFioRunner(DaosPool):
     """ Class for the FIO benchmark to test DAOS performance over
         DFS program
     """
-    def __init__(self, env, client_config, jobs, iosize, scm_size,
+    def __init__(self, env, client_config, agent_config, jobs, iosize, scm_size,
                  nvme_size, agg_mode):
         """ Initialize a FIO runner class with DAOS pool object """
-        DaosPool.__init__(self, env, client_config, scm_size, nvme_size,
+        DaosPool.__init__(self, env, client_config, agent_config, scm_size, nvme_size,
                           agg_mode)
         self.jobs = jobs
         self.iosize = iosize
@@ -26,13 +26,20 @@ class DaosFioRunner(DaosPool):
         self.cont_sys = None
         self.fstype = None
 
+    def set_num_jobs(self, jobs):
+        self.jobs = jobs
+
+    def set_iosize(self, iosize):
+        self.iosize = iosize
+
     def start_agent(self):
         """ Start a DAOS agent asnynchronous """
-        cmd = self.daos_agent + " -o " + self.client_config
+        cmd = self.daos_agent + " -o " + self.agent_config
         args = shlex.split(cmd)
         proc = subprocess.Popen(args)
         self.agent_pid = proc.pid
-        print("\n****Start daos agent PID: ", self.agent_pid)
+	print("\n\n")
+        print("Start daos agent PID: ", self.agent_pid)
         time.sleep(3) # sleep a bit for pretty print
 
     def stop_agent(self):
@@ -46,7 +53,8 @@ class DaosFioRunner(DaosPool):
 
         if not self.agent_pid is None:
             cmd = "kill -9 " + str(self.agent_pid)
-            print("\n****Stopping daos_agent pid",
+            print("\n")
+            print("Stopping daos_agent pid",
                   str(self.agent_pid)+"\n")
             args = shlex.split(cmd)
             res = subprocess.check_output(args)
@@ -110,7 +118,7 @@ class DaosFioRunner(DaosPool):
         return
 
     def setup_fio_config(self, config_file, blocksize, iodepth, daos_chunk,
-                         operation):
+                         jobs, operation):
         """ Create an FIO config file at runtime """
         cfile = open(config_file, "w+")
         cfile.write("[global]\n")
@@ -120,7 +128,7 @@ class DaosFioRunner(DaosPool):
         svcl = "daos_svcl=" + self.replicas +"\n"
         chsz = "daos_chsz=" + str(daos_chunk) +"\n"
         depth = "iodepth=" + str(iodepth)
-        njobs = "numjobs=" + str(self.jobs) +"\n"
+        njobs = "numjobs=" + str(jobs) +"\n"
         f_op = "rw="+ operation + "\n"
         f_iosize = "size="+ str(self.iosize) + "\n"
         bsize = "bs="+ str(blocksize) + "\n"
@@ -129,11 +137,11 @@ class DaosFioRunner(DaosPool):
         cfile.writelines(lines)
         cfile.write("group_reporting=1\nverify=0\ndirect=0\n%s\n" % depth)
         cfile.write("percentile_list=99.0:99.9:99.99:99.999:99.9999:100\n")
-        cfile.write("numa_cpu_nodes=0\nnuma_mem_policy=bind:0\n")
+        '''cfile.write("numa_cpu_nodes=0\nnuma_mem_policy=bind:0\n")'''
         cfile.write("\n\n\n[test1]\n")
         lines = [njobs, f_op, bsize, f_iosize]
         cfile.writelines(lines)
-
+        print("Completed generating fio config file at", config_file)
 
 
     def run_fio_test(self, config_file, output_dir, output_file):
@@ -141,6 +149,9 @@ class DaosFioRunner(DaosPool):
             Launch and track live  output to screen and capture in
             separate  file
         """
+        if not os.path.exists(output_dir):
+           os.makedirs(output_dir)
+
         myenv = os.environ.copy()
         myenv['LD_PRELOAD'] = self.fio_plugin
         fio_cmd = self.fio + " " + config_file
