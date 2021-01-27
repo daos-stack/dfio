@@ -82,7 +82,9 @@ struct daos_fio_options {
 	void		*pad;
 	char		*pool;
 	char		*cont;
+#if !defined(DAOS_API_VERSION_MAJOR) || DAOS_API_VERSION_MAJOR < 1
 	char		*svcl;
+#endif
 	daos_size_t	chsz;
 };
 
@@ -105,6 +107,7 @@ static struct fio_option options[] = {
 		.category	= FIO_OPT_C_ENGINE,
 		.group		= FIO_OPT_G_INVALID,
 	},
+#if !defined(DAOS_API_VERSION_MAJOR) || DAOS_API_VERSION_MAJOR < 1
 	{
 		.name           = "daos_svcl",
 		.lname          = "DAOS pool replicated service",
@@ -114,6 +117,7 @@ static struct fio_option options[] = {
 		.category	= FIO_OPT_C_ENGINE,
 		.group		= FIO_OPT_G_INVALID,
 	},
+#endif
 	{
 		.name           = "daos_chsz",
 		.lname          = "DAOS chunk size in bytes",
@@ -135,7 +139,6 @@ daos_fio_init(struct thread_data *td)
 	struct daos_fio_options	*eo = td->eo;
 	struct daos_data	*dd;
 	uuid_t			pool_uuid, co_uuid;
-	d_rank_list_t		*svcl = NULL;
 	daos_pool_info_t	pool_info;
 	daos_cont_info_t	co_info;
 	int			rc;
@@ -152,7 +155,13 @@ daos_fio_init(struct thread_data *td)
 		ERR("Failed to allocate IO queue\n");
 
 	if (!daos_initialized) {
+#if !defined(DAOS_API_VERSION_MAJOR) || DAOS_API_VERSION_MAJOR < 1
+		d_rank_list_t *svcl = NULL;
+
 		if (!eo->pool || !eo->cont || !eo->svcl)
+#else
+		if (!eo->pool || !eo->cont)
+#endif
 			ERR("Missing required DAOS options\n");
 
 		rc = daos_init();
@@ -163,6 +172,7 @@ daos_fio_init(struct thread_data *td)
 		DCHECK(rc, "Failed to parse 'Pool uuid': %s", eo->pool);
 		rc = uuid_parse(eo->cont, co_uuid);
 		DCHECK(rc, "Failed to parse 'Cont uuid': %s", eo->cont);
+#if !defined(DAOS_API_VERSION_MAJOR) || DAOS_API_VERSION_MAJOR < 1
 		svcl = daos_rank_list_parse(eo->svcl, ":");
 		if (svcl == NULL)
 			ERR("Failed to allocate svcl");
@@ -170,6 +180,10 @@ daos_fio_init(struct thread_data *td)
 		rc = daos_pool_connect(pool_uuid, NULL, svcl, DAOS_PC_RW,
 				       &poh, &pool_info, NULL);
 		d_rank_list_free(svcl);
+#else
+		rc = daos_pool_connect(pool_uuid, NULL, DAOS_PC_RW, &poh,
+				       &pool_info, NULL);
+#endif
 		DCHECK(rc, "Failed to connect to pool");
 
 		rc = daos_cont_open(poh, co_uuid, DAOS_COO_RW, &coh, &co_info,
@@ -186,8 +200,8 @@ daos_fio_init(struct thread_data *td)
 	dd->dfs = dfs;
 
 	td->io_ops_data = dd;
-	printf("[Init] pool_id=%s, container_id=%s, svcl=%s, chunk_size=%ld\n",
-	       eo->pool, eo->cont, eo->svcl, eo->chsz);
+	printf("[Init] pool_id=%s, container_id=%s, chunk_size=%ld\n",
+	       eo->pool, eo->cont, eo->chsz);
 
 	pthread_mutex_unlock(&daos_mutex);
 	return 0;
