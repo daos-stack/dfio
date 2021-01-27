@@ -6,9 +6,9 @@ user-specified DAOS pool and container. Rhis plugin is still under development.
 
 ## Build
 
-- Modify *FIO_DIR* and *DAOS_DIR* in the Makefile to the install directory of
-  fio and DAOS, respectively.
-- make
+- Use compile.sh to build the files, supply appropriate paths demanded by script
+	-- example [./compile.sh  --fio-path=/home/vishwana/daos/_build.external/fio --cart-path=/home/vishwana/daos/install/ --daos-path=/home/vishwana/daos/install/]
+- Use `make clean` to clean the build
 
 ## Usage
 
