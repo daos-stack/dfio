@@ -2,7 +2,8 @@
 ioengine=external:/home/mschaara/source/daos/src/tests/dfio/daos_fio_async
 daos_pool=${DAOS_POOL}
 daos_cont=${DAOS_CONT}
-daos_svcl=${DAOS_SVCL}
+# daos_svcl is deprecated: required for daos <= 1.0, unsupported for daos > 1.0
+daos_svcl=${DAOS_SVCL} # to be removed for DAOS version > 1.0.1
 daos_chsz=1048576
 group_reporting=1
 verify=0

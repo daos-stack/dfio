@@ -59,7 +59,9 @@ struct daos_fio_options {
 	void		*pad;
 	char		*pool;
 	char		*cont;
+#if !defined(DAOS_API_VERSION_MAJOR) || DAOS_API_VERSION_MAJOR < 1
 	char		*svcl;
+#endif
 	daos_size_t	chsz;
 };
 
@@ -82,6 +84,7 @@ static struct fio_option options[] = {
 		.category	= FIO_OPT_C_ENGINE,
 		.group		= FIO_OPT_G_INVALID,
 	},
+#if !defined(DAOS_API_VERSION_MAJOR) || DAOS_API_VERSION_MAJOR < 1
 	{
 		.name           = "daos_svcl",
 		.lname          = "DAOS pool replicated service",
@@ -91,6 +94,7 @@ static struct fio_option options[] = {
 		.category	= FIO_OPT_C_ENGINE,
 		.group		= FIO_OPT_G_INVALID,
 	},
+#endif
 	{
 		.name           = "daos_chsz",
 		.lname          = "DAOS chunk size in bytes",
@@ -111,15 +115,18 @@ daos_fio_global_init(struct thread_data *td)
 {
 	struct daos_fio_options	*eo = td->eo;
 	uuid_t			pool_uuid, co_uuid;
-	d_rank_list_t		*svcl = NULL;
 	daos_pool_info_t	pool_info;
 	daos_cont_info_t	co_info;
 	int			rc = 0;
 
+#if !defined(DAOS_API_VERSION_MAJOR) || DAOS_API_VERSION_MAJOR < 1
 	if (!eo->pool || !eo->cont || !eo->svcl) {
+#else
+	if (!eo->pool || !eo->cont) {
 		log_err("Missing required DAOS options\n");
 		return EINVAL;
 	}
+#endif
 
 	rc = daos_init();
 	if (rc != -DER_ALREADY && rc) {
@@ -142,6 +149,9 @@ daos_fio_global_init(struct thread_data *td)
 		return EINVAL;
 	}
 
+#if !defined(DAOS_API_VERSION_MAJOR) || DAOS_API_VERSION_MAJOR < 1
+	d_rank_list_t *svcl = NULL;
+
 	svcl = daos_rank_list_parse(eo->svcl, ":");
 	if (svcl == NULL) {
 		log_err("Failed to parse svcl\n");
@@ -152,6 +162,10 @@ daos_fio_global_init(struct thread_data *td)
 	rc = daos_pool_connect(pool_uuid, NULL, svcl, DAOS_PC_RW,
 			&poh, &pool_info, NULL);
 	d_rank_list_free(svcl);
+#else
+	rc = daos_pool_connect(pool_uuid, NULL, DAOS_PC_RW, &poh, &pool_info,
+			       NULL);
+#endif
 	if (rc) {
 		log_err("Failed to connect to pool %d\n", rc);
 		td_verror(td, EINVAL, "daos_pool_connect");
@@ -175,8 +189,8 @@ daos_fio_global_init(struct thread_data *td)
 		return EINVAL;
 	}
 
-	log_info("[Init] pool_id=%s, container_id=%s, svcl=%s, chunk_size=%ld\n",
-		 eo->pool, eo->cont, eo->svcl, eo->chsz);
+	log_info("[Init] pool_id=%s, container_id=%s, chunk_size=%ld\n",
+		 eo->pool, eo->cont, eo->chsz);
 
 	return 0;
 }
