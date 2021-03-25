@@ -46,6 +46,7 @@ struct daos_iou {
 	d_iov_t		iov;
 	daos_event_t	ev;
 	bool		complete;
+	size_t		size;
 };
 
 struct daos_data {
@@ -455,7 +456,7 @@ daos_fio_queue(struct thread_data *td, struct io_u *io_u)
 		}
 		break;
 	case DDIR_READ:
-		rc = dfs_read(dfs, dd->obj, &io->sgl, offset, &ret,
+		rc = dfs_read(dfs, dd->obj, &io->sgl, offset, &io->size,
 			      &io->ev);
 		if (rc) {
 			log_err("dfs_read failed: %d\n", rc);
